@@ -1,72 +1,96 @@
 import streamlit as st
+import requests
 import pandas as pd
 import pydeck as pdk
 
 # 1. 페이지 설정
-st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide")
 
 st.title("📊 서울시 상권 분석 & AI 컨설팅")
 st.caption("Seoul-Realty AI | 2026 서울시 빅데이터 활용 경진대회 출품작")
 
-# 2. 가상 데이터 생성 (위도, 경도 추가)
-def get_dummy_data():
-    data = {
-        '상권명': ['강남역', '홍대입구역', '명동거리', '가로수길', '이태원'],
-        '업종명': ['한식음식점', '커피-음료', '의류소매', '양식음식점', '일식음식점'],
-        '당월_매출액': [150000000, 120000000, 200000000, 95000000, 80000000],
-        '매력도_점수': [95.5, 92.1, 88.4, 85.0, 79.2],
-        # 서울 주요 상권 좌표
-        'lat': [37.4979, 37.5565, 37.5634, 37.5204, 37.5345],
-        'lon': [127.0276, 126.9244, 126.9860, 127.0230, 126.9942]
-    }
-    return pd.DataFrame(data)
+# 2. 인증키 및 수정된 서비스명 적용
+API_KEY = '776274504662736c3132334e5a767861'
+SERVICE = 'VwsmTrdarSelngQq'  # 알려주신 정답 서비스명 적용!
 
-df = get_dummy_data()
-
-# 3. 사이드바 구성
-with st.sidebar:
-    st.header("🔍 분석 조건 설정")
-    selected_district = st.selectbox("분석할 상권을 선택하세요", df['상권명'].unique())
-    selected_data = df[df['상권명'] == selected_district].iloc[0]
+# 3. 실시간 데이터 수집 함수
+@st.cache_data(ttl=3600)  # 1시간 동안 캐싱하여 속도 최적화
+def load_real_data():
+    # JSON 형식으로 상위 50개 데이터를 땡겨옵니다.
+    url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/50/"
     
-    st.divider()
-    st.subheader(f"📌 {selected_district} 분석 요약")
-    st.metric("추정 매출액", f"{selected_data['당월_매출액']:,}원")
-    st.metric("상권 매력도", f"{selected_data['매력도_점수']}점")
+    try:
+        response = requests.get(url, timeout=5)
+        data = response.json()
+        
+        if SERVICE in data:
+            df = pd.DataFrame(data[SERVICE]['row'])
+            
+            # 지도 시각화를 위해 가상 좌표(lat, lon) 매핑 
+            # (실제 상권 마스터 데이터와 결합하기 전 임시 좌표 부여)
+            df['lat'] = 37.5665 + (pd.to_numeric(df['THSMON_SELNG_AMT']).rank(pct=True) - 0.5) * 0.1
+            df['lon'] = 126.9780 + (pd.to_numeric(df['THSMON_SELNG_CO']).rank(pct=True) - 0.5) * 0.1
+            
+            # 주요 컬럼 한글화 및 타입 변환
+            df['당월_매출액'] = pd.to_numeric(df['THSMON_SELNG_AMT'])
+            df['당월_매출건수'] = pd.to_numeric(df['THSMON_SELNG_CO'])
+            df['상권명'] = df['TRDAR_CD_NM']
+            df['업종명'] = df['SVC_INDUTY_CD_NM']
+            
+            return df
+        else:
+            return None
+    except Exception as e:
+        return None
 
-# 4. 메인 화면 - 3D 지도 시각화
-st.subheader("📍 서울시 주요 상권 매력도 (3D Map)")
-st.info("기둥의 높이는 '당월 매출액'을, 색상의 붉은 정도는 '매력도 점수'를 나타냅니다.")
+# 데이터 로드
+df = load_real_data()
 
-# Pydeck을 이용한 3D 지도 레이어 설정
-layer = pdk.Layer(
-    'ColumnLayer', # 3D 기둥 레이어
-    df,
-    get_position='[lon, lat]',
-    get_elevation='당월_매출액', # 기둥 높이
-    elevation_scale=0.005,      # 높이 스케일 조절
-    radius=150,                 # 기둥 반경
-    get_fill_color='[매력도_점수 * 2.5, 50, 150, 200]', # 색상 (매력도가 높을수록 붉어짐)
-    pickable=True,              # 마우스 오버 시 툴팁 표시 여부
-    auto_highlight=True
-)
+# 4. 화면 UI 및 시각화
+if df is not None:
+    st.success(f"✅ 서울시 실시간 상권 데이터 연동 성공! (총 {len(df)}개 데이터)")
+    
+    # 사이드바
+    with st.sidebar:
+        st.header("🔍 분석 조건 설정")
+        selected_district = st.selectbox("분석할 상권을 선택하세요", df['상권명'].unique())
+        selected_data = df[df['상권명'] == selected_district].iloc[0]
+        
+        st.divider()
+        st.subheader(f"📌 {selected_district} 요약")
+        st.metric("추정 매출액", f"{int(selected_data['당월_매출액']):,}원")
+        st.metric("추정 매출건수", f"{int(selected_data['당월_매출건수']):,}건")
 
-# 지도 중심점 설정 (서울 중심)
-view_state = pdk.ViewState(
-    latitude=37.53,
-    longitude=126.98,
-    zoom=11,
-    pitch=45, # 지도 기울기 (3D 효과)
-    bearing=0
-)
+    # 3D 지도 레이어 설정
+    layer = pdk.Layer(
+        'ColumnLayer',
+        df,
+        get_position='[lon, lat]',
+        get_elevation='당월_매출액',
+        elevation_scale=0.0005,  # 실제 매출액 단위가 크므로 스케일 대폭 축소
+        radius=200,
+        get_fill_color='[255, 50, 50, 200]',  # 붉은색 기둥
+        pickable=True,
+        auto_highlight=True
+    )
 
-# 지도 렌더링
-st.pydeck_chart(pdk.Deck(
-    layers=[layer],
-    initial_view_state=view_state,
-    tooltip={"text": "상권명: {상권명}\n업종: {업종명}\n매출액: {당월_매출액}원"}
-))
+    view_state = pdk.ViewState(
+        latitude=37.5665,
+        longitude=126.9780,
+        zoom=11,
+        pitch=45
+    )
 
-# 5. 하단 데이터 테이블
-st.subheader("📋 전체 상권 데이터 데이터프레임")
-st.dataframe(df, use_container_width=True)
+    st.subheader("📍 서울시 실시간 상권 매출 현황 (3D Map)")
+    st.pydeck_chart(pdk.Deck(
+        layers=[layer],
+        initial_view_state=view_state,
+        tooltip={"text": "상권명: {상권명}\n업종: {업종명}\n매출액: {당월_매출액}원"}
+    ))
+    
+    st.subheader("📋 데이터 상세 보기")
+    st.dataframe(df[['상권명', '업종명', '당월_매출액', '당월_매출건수']], use_container_width=True)
+
+else:
+    st.error("😭 여전히 데이터를 불러올 수 없습니다. 서비스명 오탈자를 다시 확인해주세요.")
+    st.info("임시 URL로 브라우저에서 직접 접속이 되는지 확인해보세요.")
