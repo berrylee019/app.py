@@ -17,7 +17,7 @@ SERVICE = 'VwsmTrdarSelngQq'  # 알려주신 정답 서비스명 적용!
 @st.cache_data(ttl=3600)  # 1시간 동안 캐싱하여 속도 최적화
 def load_real_data():
     # JSON 형식으로 상위 50개 데이터를 땡겨옵니다.
-    url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/50/"
+    url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/25/"
     
     try:
         response = requests.get(url, timeout=5)
