@@ -94,3 +94,55 @@ if df is not None:
 else:
     st.error("😭 여전히 데이터를 불러올 수 없습니다. 서비스명 오탈자를 다시 확인해주세요.")
     st.info("임시 URL로 브라우저에서 직접 접속이 되는지 확인해보세요.")
+    
+import google.generativeai as genai
+
+# 1. 제미나이 API 설정 (형님의 API 키를 입력하세요)
+genai.configure(api_key="YOUR_GEMINI_API_KEY")
+model = genai.GenerativeModel('gemini-2.5-flash')
+
+# 2. AI 분석 리포트 생성 함수
+def get_ai_consulting(sangkwon, industry, sales, count):
+    # 평균 객단가 계산
+    avg_price = sales / count if count > 0 else 0
+    
+    # AI에게 던질 프롬프트 (페르소나 부여)
+    prompt = f"""
+    당신은 서울시 소상공인을 위한 20년 경력의 전문 상권 분석 컨설턴트입니다.
+    다음 데이터를 바탕으로 '형님'에게 조언하듯 친절하면서도 날카로운 분석 보고서를 작성해주세요.
+    
+    [데이터 정보]
+    - 상권명: {sangkwon}
+    - 업종: {industry}
+    - 당월 매출액: {int(sales):,}원
+    - 당월 매출건수: {int(count):,}건
+    - 추정 객단가: {int(avg_price):,}원
+    
+    [보고서 포함 내용]
+    1. 현재 매출 규모에 대한 냉정한 평가
+    2. 객단가 기반의 타겟 고객층 분석
+    3. 이 상권에서 성공하기 위한 핵심 전략 1가지
+    """
+    
+    try:
+        response = model.generate_content(prompt)
+        return response.text
+    except:
+        return "⚠️ AI 컨설턴트가 잠시 외출 중입니다. (API 키 확인 필요)"
+
+# 3. Streamlit 메인 화면 하단에 보고서 배치
+st.divider()
+st.subheader(f"🤖 AI 컨설턴트의 '{selected_district}' 분석 리포트")
+
+with st.spinner('AI가 데이터를 분석하여 전략을 세우고 있습니다...'):
+    # 선택된 상권의 실시간 데이터를 기반으로 AI 호출
+    report = get_ai_consulting(
+        selected_data['상권명'], 
+        selected_data['업종명'], 
+        selected_data['당월_매출액'], 
+        selected_data['당월_매출건수']
+    )
+    
+    # AI 채팅창 스타일로 출력
+    with st.chat_message("assistant", avatar="🤖"):
+        st.markdown(report)
