@@ -68,7 +68,7 @@ if df is not None:
         get_position='[lon, lat]',
         get_elevation='당월_매출액',
         elevation_scale=0.00002,      # 👈 기존 0.0005에서 대폭 축소 (높이 낮춤)
-        radius=1000,                  # 👈 기존 200에서 1000으로 변경 (기둥을 5배 굵게)
+        radius=500,                  # 👈 기존 200에서 500으로 변경 (기둥을 2.5배 굵게)
         get_fill_color='[255, 50, 50, 200]',  # 붉은색 기둥
         pickable=True,
         auto_highlight=True
