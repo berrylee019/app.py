@@ -28,8 +28,8 @@ def load_real_data():
             
             # 지도 시각화를 위해 가상 좌표(lat, lon) 매핑 
             # (실제 상권 마스터 데이터와 결합하기 전 임시 좌표 부여)
-            df['lat'] = 37.5665 + (pd.to_numeric(df['THSMON_SELNG_AMT']).rank(pct=True) - 0.5) * 0.1
-            df['lon'] = 126.9780 + (pd.to_numeric(df['THSMON_SELNG_CO']).rank(pct=True) - 0.5) * 0.1
+            df['lat'] = 37.5665 + (pd.to_numeric(df['THSMON_SELNG_AMT']).rank(pct=True) - 0.5) * 0.3
+            df['lon'] = 126.9780 + (pd.to_numeric(df['THSMON_SELNG_CO']).rank(pct=True) - 0.5) * 0.3
             
             # 주요 컬럼 한글화 및 타입 변환
             df['당월_매출액'] = pd.to_numeric(df['THSMON_SELNG_AMT'])
