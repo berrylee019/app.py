@@ -98,7 +98,7 @@ else:
 import google.generativeai as genai
 
 # 1. 제미나이 API 설정 (형님의 API 키를 입력하세요)
-genai.configure(api_key="YOUR_GEMINI_API_KEY")
+genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 model = genai.GenerativeModel('gemini-2.5-flash')
 
 # 2. AI 분석 리포트 생성 함수
