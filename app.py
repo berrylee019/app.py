@@ -10,8 +10,13 @@ transformer = Transformer.from_crs("epsg:5181", "epsg:4326", always_xy=True)
 
 # 엑스좌표, 와이좌표를 위경도로 변환하는 함수
 def convert_coords(row):
-    lon, lat = transformer.transform(row['lon'], row['lat'])
-    return pd.Series([lon, lat])
+    try:
+            # x(lon), y(lat) 순서로 변환
+            lon, lat = transformer.transform(row['lon'], row['lat'])
+            return pd.Series([lon, lat])
+        except:
+            # 변환 실패 시 원래 값 유지 (혹은 0)
+            return pd.Series([row['lon'], row['lat']])
 
 # merge된 데이터프레임에 적용하기
 merged_df[['lon', 'lat']] = merged_df.apply(convert_coords, axis=1)
@@ -61,7 +66,9 @@ def load_real_data():
     area_df['TRDAR_CD'] = area_df['TRDAR_CD'].astype(str)
     
     merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
-
+    
+    # 🚨 [여기서 호출!] 이제 파이썬이 위에서 정의한 함수를 찾아낼 수 있습니다.
+    merged_df[['lon', 'lat']] = merged_df.apply(convert_coords, axis=1)
     
     # 3. 필요한 컬럼만 추출 (상권코드, 중심점 위도, 중심점 경도)
     # 서울시 상권영역 데이터의 좌표 컬럼명은 보통 X_CNTS, Y_CNTS (또는 TRDAR_CD_LMT 등)로 되어 있습니다.
