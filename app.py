@@ -18,8 +18,7 @@ def convert_coords(row):
             # 변환 실패 시 원래 값 유지 (혹은 0)
             return pd.Series([row['lon'], row['lat']])
 
-# merge된 데이터프레임에 적용하기
-merged_df[['lon', 'lat']] = merged_df.apply(convert_coords, axis=1)
+
 
 # 1. 페이지 설정
 st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide")
