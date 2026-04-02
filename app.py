@@ -22,11 +22,18 @@ def load_real_data():
     sales_res = requests.get(sales_url).json()
     sales_df = pd.DataFrame(sales_res['VwsmTrdarSelngQq']['row'])
     
-    # 2. 상권 영역 좌표 데이터 가져오기 (가점 2점 획득용 결합 데이터!)
-    # 데이터셋 명: 서울시 상권분석서비스(상권영역)
+    # 2. 상권 영역 좌표 데이터 가져오기
     area_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/VwsmTrdarArea/1/1000/"
     area_res = requests.get(area_url).json()
-    area_df = pd.DataFrame(area_res['VwsmTrdarArea']['row'])
+    
+    # [안전장치 추가] 응답에 진짜 VwsmTrdarArea가 있는지 확인
+    if 'VwsmTrdarArea' in area_res:
+        area_df = pd.DataFrame(area_res['VwsmTrdarArea']['row'])
+    else:
+        # 에러가 났다면 화면에 서울시의 진짜 대답을 보여주고 멈춥니다.
+        st.error("🚨 서울시 API에서 데이터를 정상적으로 가져오지 못했습니다!")
+        st.write("구글 서버의 실제 응답 내용:", area_res)
+        st.stop() # 에러가 났으니 여기서 실행 중단
     
     # 3. 필요한 컬럼만 추출 (상권코드, 중심점 위도, 중심점 경도)
     # 서울시 상권영역 데이터의 좌표 컬럼명은 보통 X_CNTS, Y_CNTS (또는 TRDAR_CD_LMT 등)로 되어 있습니다.
