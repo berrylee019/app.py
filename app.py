@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import pydeck as pdk
+import os
 
 # 1. 페이지 설정
 st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide")
