@@ -21,17 +21,28 @@ def load_real_data():
     sales_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/VwsmTrdarSelngQq/1/25/"
     sales_res = requests.get(sales_url).json()
     sales_df = pd.DataFrame(sales_res['VwsmTrdarSelngQq']['row'])
+
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    csv_path = os.path.join(current_dir, 'commercial_area.csv')
     
-    # 2. 좌표 데이터는 안전하게 로컬 CSV에서 가져오기 (500 에러 원천 차단!)
-    # 대회 가점용 이종 데이터 결합 작업!
-    area_df = pd.read_csv('commercial_area.csv') 
-    
-    # 상권코드 컬럼명 맞춰서 merge
+    # [수정] 인코딩 에러 방어 로직
+    try:
+        # 1. 엑셀/공공데이터의 표준인 CP949로 먼저 시도
+        area_df = pd.read_csv(csv_path, encoding='cp949')
+    except UnicodeDecodeError:
+        try:
+            # 2. 실패 시 전통적인 한국어 인코딩인 EUC-KR로 시도
+            area_df = pd.read_csv(csv_path, encoding='euc-kr')
+        except UnicodeDecodeError:
+            # 3. 그것도 안 되면 BOM이 포함된 UTF-8로 최종 시도
+            area_df = pd.read_csv(csv_path, encoding='utf-8-sig')
+            
+    # 상권코드 컬럼명 맞춰서 merge (이하 동일)
     area_df = area_df[['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']]
     area_df.rename(columns={'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat'}, inplace=True)
     
-    # 데이터 결합
     merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
+
     
     # 3. 필요한 컬럼만 추출 (상권코드, 중심점 위도, 중심점 경도)
     # 서울시 상권영역 데이터의 좌표 컬럼명은 보통 X_CNTS, Y_CNTS (또는 TRDAR_CD_LMT 등)로 되어 있습니다.
