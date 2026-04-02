@@ -22,18 +22,16 @@ def load_real_data():
     sales_res = requests.get(sales_url).json()
     sales_df = pd.DataFrame(sales_res['VwsmTrdarSelngQq']['row'])
     
-    # 2. 상권 영역 좌표 데이터 가져오기
-    area_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/VwsmTrdarArea/1/1000/"
-    area_res = requests.get(area_url).json()
+    # 2. 좌표 데이터는 안전하게 로컬 CSV에서 가져오기 (500 에러 원천 차단!)
+    # 대회 가점용 이종 데이터 결합 작업!
+    area_df = pd.read_csv('commercial_area.csv') 
     
-    # [안전장치 추가] 응답에 진짜 VwsmTrdarArea가 있는지 확인
-    if 'VwsmTrdarArea' in area_res:
-        area_df = pd.DataFrame(area_res['VwsmTrdarArea']['row'])
-    else:
-        # 에러가 났다면 화면에 서울시의 진짜 대답을 보여주고 멈춥니다.
-        st.error("🚨 서울시 API에서 데이터를 정상적으로 가져오지 못했습니다!")
-        st.write("구글 서버의 실제 응답 내용:", area_res)
-        st.stop() # 에러가 났으니 여기서 실행 중단
+    # 상권코드 컬럼명 맞춰서 merge
+    area_df = area_df[['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']]
+    area_df.rename(columns={'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat'}, inplace=True)
+    
+    # 데이터 결합
+    merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
     
     # 3. 필요한 컬럼만 추출 (상권코드, 중심점 위도, 중심점 경도)
     # 서울시 상권영역 데이터의 좌표 컬럼명은 보통 X_CNTS, Y_CNTS (또는 TRDAR_CD_LMT 등)로 되어 있습니다.
