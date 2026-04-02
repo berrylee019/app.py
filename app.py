@@ -14,7 +14,7 @@ def convert_coords(row):
             # x(lon), y(lat) 순서로 변환
             lon, lat = transformer.transform(row['lon'], row['lat'])
             return pd.Series([lon, lat])
-        except:
+    except:
             # 변환 실패 시 원래 값 유지 (혹은 0)
             return pd.Series([row['lon'], row['lat']])
 
