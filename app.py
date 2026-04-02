@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import pandas as pd
 import pydeck as pdk
-import os
 
 # 1. 페이지 설정
 st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide")
@@ -16,6 +15,8 @@ SERVICE = 'VwsmTrdarSelngQq'  # 알려주신 정답 서비스명 적용!
 
 # 3. 실시간 데이터 수집 함수
 @st.cache_data(ttl=3600)  # 1시간 동안 캐싱하여 속도 최적화
+
+import os
 
 def load_real_data():
     # 1. 상권 매출 데이터 가져오기 (25개)
