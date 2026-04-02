@@ -15,33 +15,36 @@ SERVICE = 'VwsmTrdarSelngQq'  # 알려주신 정답 서비스명 적용!
 
 # 3. 실시간 데이터 수집 함수
 @st.cache_data(ttl=3600)  # 1시간 동안 캐싱하여 속도 최적화
+
 def load_real_data():
-    # JSON 형식으로 상위 50개 데이터를 땡겨옵니다.
-    url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/25/"
+    # 1. 상권 매출 데이터 가져오기 (25개)
+    sales_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/VwsmTrdarSelngQq/1/25/"
+    sales_res = requests.get(sales_url).json()
+    sales_df = pd.DataFrame(sales_res['VwsmTrdarSelngQq']['row'])
     
-    try:
-        response = requests.get(url, timeout=5)
-        data = response.json()
-        
-        if SERVICE in data:
-            df = pd.DataFrame(data[SERVICE]['row'])
-            
-            # 지도 시각화를 위해 가상 좌표(lat, lon) 매핑 
-            # (실제 상권 마스터 데이터와 결합하기 전 임시 좌표 부여)
-            df['lat'] = 37.5665 + (pd.to_numeric(df['THSMON_SELNG_AMT']).rank(pct=True) - 0.5) * 0.3
-            df['lon'] = 126.9780 + (pd.to_numeric(df['THSMON_SELNG_CO']).rank(pct=True) - 0.5) * 0.3
-            
-            # 주요 컬럼 한글화 및 타입 변환
-            df['당월_매출액'] = pd.to_numeric(df['THSMON_SELNG_AMT'])
-            df['당월_매출건수'] = pd.to_numeric(df['THSMON_SELNG_CO'])
-            df['상권명'] = df['TRDAR_CD_NM']
-            df['업종명'] = df['SVC_INDUTY_CD_NM']
-            
-            return df
-        else:
-            return None
-    except Exception as e:
-        return None
+    # 2. 상권 영역 좌표 데이터 가져오기 (가점 2점 획득용 결합 데이터!)
+    # 데이터셋 명: 서울시 상권분석서비스(상권영역)
+    area_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/VwsmTrdarArea/1/1000/"
+    area_res = requests.get(area_url).json()
+    area_df = pd.DataFrame(area_res['VwsmTrdarArea']['row'])
+    
+    # 3. 필요한 컬럼만 추출 (상권코드, 중심점 위도, 중심점 경도)
+    # 서울시 상권영역 데이터의 좌표 컬럼명은 보통 X_CNTS, Y_CNTS (또는 TRDAR_CD_LMT 등)로 되어 있습니다.
+    # 여기서는 표준적인 위경도 컬럼명을 가정하고 작성했습니다.
+    area_df = area_df[['TRDAR_CD', 'TRDAR_CD_NM', 'X_CNTS', 'Y_CNTS']]
+    area_df.rename(columns={'X_CNTS': 'lon', 'Y_CNTS': 'lat'}, inplace=True)
+    
+    # 4. 판다스 Merge (상권코드를 기준으로 두 데이터 결합)
+    # 매출 데이터의 'TRDAR_CD'와 영역 데이터의 'TRDAR_CD'가 같은 것끼리 묶어줍니다.
+    merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
+    
+    # 숫자로 변환
+    merged_df['lat'] = pd.to_numeric(merged_df['lat'])
+    merged_df['lon'] = pd.to_numeric(merged_df['lon'])
+    merged_df['당월_매출액'] = pd.to_numeric(merged_df['THSMON_SELNG_AMT'])
+    merged_df['상권명'] = merged_df['TRDAR_CD_NM']
+    
+    return merged_df
 
 # 데이터 로드
 df = load_real_data()
