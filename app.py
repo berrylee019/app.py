@@ -24,6 +24,7 @@ def load_real_data():
     sales_res = requests.get(sales_url).json()
     sales_df = pd.DataFrame(sales_res['VwsmTrdarSelngQq']['row'])
 
+    # 2. 좌표 데이터 가져오기 (CSV)
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(current_dir, 'commercial_area.csv')
     
@@ -42,6 +43,10 @@ def load_real_data():
     # 상권코드 컬럼명 맞춰서 merge (이하 동일)
     area_df = area_df[['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']]
     area_df.rename(columns={'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat'}, inplace=True)
+
+    # 🚨 [핵심 해결책] 두 데이터의 상권코드 타입을 '문자열'로 완벽 통일
+    sales_df['TRDAR_CD'] = sales_df['TRDAR_CD'].astype(str)
+    area_df['TRDAR_CD'] = area_df['TRDAR_CD'].astype(str)
     
     merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
 
