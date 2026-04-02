@@ -64,10 +64,15 @@ def load_real_data():
     # 숫자로 변환
     merged_df['lat'] = pd.to_numeric(merged_df['lat'])
     merged_df['lon'] = pd.to_numeric(merged_df['lon'])
-    merged_df['당월_매출액'] = pd.to_numeric(merged_df['THSMON_SELNG_AMT'])
-    merged_df['당월_매출건수'] = pd.to_numeric(merged_df['THSMON_SELNG_CO'])
+    merged_df['당월_매출액'] = pd.to_numeric(merged_df['THSMON_SELNG_AMT'], errors='coerce').fillna(0)
+    merged_df['당월_매출건수'] = pd.to_numeric(merged_df['THSMON_SELNG_CO'], errors='coerce').fillna(0)
     merged_df['상권명'] = merged_df['상권_코드_명']
-    
+    merged_df['업종명'] = merged_df['SVC_INDUTY_CD_NM']
+
+    if 'SVC_INDUTY_CD_NM' not in merged_df.columns:
+        # 혹시라도 컬럼명이 다를 경우를 대비한 방어 로직 (빈 값 방지)
+        merged_df['업종명'] = "알 수 없음"
+        
     return merged_df
 
 # 데이터 로드
