@@ -39,7 +39,11 @@ def load_real_data():
         except UnicodeDecodeError:
             # 3. 그것도 안 되면 BOM이 포함된 UTF-8로 최종 시도
             area_df = pd.read_csv(csv_path, encoding='utf-8-sig')
-            
+
+    # 🚨 [여기서부터 수정] CSV 파일의 진짜 컬럼명을 화면에 찍어봅니다.
+    st.write("📊 형님, CSV 파일에 들어있는 실제 컬럼명들입니다:", area_df.columns.tolist())
+    st.stop() # 일단 여기서 멈추고 화면에 컬럼명만 띄웁니다.
+    
     # 상권코드 컬럼명 맞춰서 merge (이하 동일)
     area_df = area_df[['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']]
     area_df.rename(columns={'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat'}, inplace=True)
