@@ -3,6 +3,18 @@ import requests
 import pandas as pd
 import pydeck as pdk
 import os
+from pyproj import Transformer
+
+# 중부원점(EPSG:2097 또는 5174 등) -> GPS 위경도(EPSG:4326) 변환기
+transformer = Transformer.from_crs("epsg:5181", "epsg:4326", always_xy=True)
+
+# 엑스좌표, 와이좌표를 위경도로 변환하는 함수
+def convert_coords(row):
+    lon, lat = transformer.transform(row['lon'], row['lat'])
+    return pd.Series([lon, lat])
+
+# merge된 데이터프레임에 적용하기
+merged_df[['lon', 'lat']] = merged_df.apply(convert_coords, axis=1)
 
 # 1. 페이지 설정
 st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide")
