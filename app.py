@@ -39,10 +39,6 @@ def load_real_data():
         except UnicodeDecodeError:
             # 3. 그것도 안 되면 BOM이 포함된 UTF-8로 최종 시도
             area_df = pd.read_csv(csv_path, encoding='utf-8-sig')
-
-    # 🚨 [여기서부터 수정] CSV 파일의 진짜 컬럼명을 화면에 찍어봅니다.
-    st.write("📊 형님, CSV 파일에 들어있는 실제 컬럼명들입니다:", area_df.columns.tolist())
-    st.stop() # 일단 여기서 멈추고 화면에 컬럼명만 띄웁니다.
     
     # 상권코드 컬럼명 맞춰서 merge (이하 동일)
     area_df = area_df[['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']]
@@ -58,18 +54,18 @@ def load_real_data():
     # 3. 필요한 컬럼만 추출 (상권코드, 중심점 위도, 중심점 경도)
     # 서울시 상권영역 데이터의 좌표 컬럼명은 보통 X_CNTS, Y_CNTS (또는 TRDAR_CD_LMT 등)로 되어 있습니다.
     # 여기서는 표준적인 위경도 컬럼명을 가정하고 작성했습니다.
-    area_df = area_df[['TRDAR_CD', 'TRDAR_CD_NM', 'X_CNTS', 'Y_CNTS']]
-    area_df.rename(columns={'X_CNTS': 'lon', 'Y_CNTS': 'lat'}, inplace=True)
+    #area_df = area_df[['TRDAR_CD', 'TRDAR_CD_NM', 'X_CNTS', 'Y_CNTS']]
+    #area_df.rename(columns={'X_CNTS': 'lon', 'Y_CNTS': 'lat'}, inplace=True)
     
     # 4. 판다스 Merge (상권코드를 기준으로 두 데이터 결합)
     # 매출 데이터의 'TRDAR_CD'와 영역 데이터의 'TRDAR_CD'가 같은 것끼리 묶어줍니다.
-    merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
+    #merged_df = pd.merge(sales_df, area_df, on='TRDAR_CD', how='inner')
     
     # 숫자로 변환
     merged_df['lat'] = pd.to_numeric(merged_df['lat'])
     merged_df['lon'] = pd.to_numeric(merged_df['lon'])
     merged_df['당월_매출액'] = pd.to_numeric(merged_df['THSMON_SELNG_AMT'])
-    merged_df['상권명'] = merged_df['TRDAR_CD_NM']
+    merged_df['상권명'] = merged_df['상권_코드_명']
     
     return merged_df
 
