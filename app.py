@@ -65,6 +65,7 @@ def load_real_data():
     merged_df['lat'] = pd.to_numeric(merged_df['lat'])
     merged_df['lon'] = pd.to_numeric(merged_df['lon'])
     merged_df['당월_매출액'] = pd.to_numeric(merged_df['THSMON_SELNG_AMT'])
+    merged_df['당월_매출건수'] = pd.to_numeric(merged_df['THSMON_SELNG_CO'])
     merged_df['상권명'] = merged_df['상권_코드_명']
     
     return merged_df
