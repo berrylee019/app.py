@@ -131,7 +131,7 @@ if df is not None and not df.empty:
 
     # AI 분석 리포트 (하단 배치)
     import google.generativeai as genai
-    genai.configure(api_key=st.secrets["MY_API_KEY"])
+    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
     model = genai.GenerativeModel('gemini-2.5-flash') # 최신 모델 반영
 
     def get_ai_consulting(sangkwon, industry, sales, count):
