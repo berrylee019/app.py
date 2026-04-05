@@ -28,11 +28,17 @@ SERVICE = 'VwsmTrdarSelngQq'
 
 @st.cache_data(ttl=3600)
 def load_real_data():
-    # 💡 수정 포인트 1: 데이터를 1,000개로 늘려서 제과점 데이터도 안정적으로 확보합니다.
-    sales_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/1000/"
+    # 💡 수정 포인트 1: 제과점 데이터를 확실히 확보하기 위해 1~1000번, 1001~2000번 데이터를 모두 가져와 합칩니다.
+    sales_url1 = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/1000/"
+    sales_url2 = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1001/2000/"
+    
     try:
-        sales_res = requests.get(sales_url).json()
-        raw_sales_df = pd.DataFrame(sales_res[SERVICE]['row'])
+        sales_res1 = requests.get(sales_url1).json()
+        sales_res2 = requests.get(sales_url2).json()
+        
+        raw_df1 = pd.DataFrame(sales_res1[SERVICE]['row'])
+        raw_df2 = pd.DataFrame(sales_res2[SERVICE]['row'])
+        raw_sales_df = pd.concat([raw_df1, raw_df2], ignore_index=True)
     except Exception as e:
         st.error(f"데이터 로드 실패: {e}")
         return None
@@ -75,11 +81,19 @@ if df is not None and not df.empty:
     with st.sidebar:
         st.header("🔍 분석 조건 설정")
         
-        # 💡 수정 포인트 2: 선택지에 '커피-음료'와 '제과점'을 명시적으로 고정해 둡니다.
         target_industries = ['커피-음료', '제과점']
         industry_filter = st.multiselect("업종 선택", options=target_industries, default=target_industries)
         
-        filtered_df = df[df['업종명'].isin(industry_filter)]
+        # 필터링 및 복사본 생성
+        filtered_df = df[df['업종명'].isin(industry_filter)].copy()
+        
+        # 💡 수정 포인트 2: 업종별 원통 색상 지정 (RGBA 값)
+        def assign_color(row):
+            if row['업종명'] == '제과점':
+                return [255, 165, 0, 200]  # 제과점은 주황색
+            return [255, 50, 50, 200]      # 커피-음료는 빨간색
+            
+        filtered_df['color'] = filtered_df.apply(assign_color, axis=1)
         
         if not filtered_df.empty:
             selected_district = st.selectbox("분석 상권 선택", filtered_df['상권명'].unique())
@@ -96,7 +110,7 @@ if df is not None and not df.empty:
         get_elevation='당월_매출액', 
         elevation_scale=0.00002, 
         radius=500, 
-        get_fill_color='[255, 50, 50, 200]', 
+        get_fill_color='color',  # 💡 수정 포인트 3: 생성한 color 컬럼을 색상 데이터로 활용
         pickable=True,
         auto_highlight=True
     )
@@ -114,7 +128,7 @@ if df is not None and not df.empty:
     # AI 설정
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"]) # Secrets의 이름과 맞춤
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         st.divider()
         st.subheader(f"🤖 AI 컨설턴트 분석")
