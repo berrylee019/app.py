@@ -155,7 +155,7 @@ if df is not None and not df.empty:
     # AI 설정
     try:
         genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         st.divider()
         st.subheader(f"🤖 AI 컨설턴트 분석")
