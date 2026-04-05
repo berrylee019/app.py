@@ -4,7 +4,7 @@ import pandas as pd
 import pydeck as pdk
 import os
 from pyproj import Transformer
-from google import genai  # 최신 라이브러리로 교체
+import google.generativeai as genai # 다시 안정적인 구형 라이브러리 방식으로 복구
 
 # 변환기 설정
 transformer = Transformer.from_crs("epsg:5181", "epsg:4326", always_xy=True)
@@ -22,14 +22,18 @@ st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="
 st.title("📊 서울시 상권 분석 & AI 컨설팅")
 st.caption("Seoul-Realty AI | 2026 서울시 빅데이터 활용 경진대회 출품작")
 
+# API 및 서비스 설정
 API_KEY = '776274504662736c3132334e5a767861'
 SERVICE = 'VwsmTrdarSelngQq'
 
 @st.cache_data(ttl=3600)
 def load_real_data():
     sales_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/100/"
-    sales_res = requests.get(sales_url).json()
-    raw_sales_df = pd.DataFrame(sales_res[SERVICE]['row'])
+    try:
+        sales_res = requests.get(sales_url).json()
+        raw_sales_df = pd.DataFrame(sales_res[SERVICE]['row'])
+    except:
+        return None
 
     # 커피전문점 OR 제과점 합집합 필터링 (최대 25개)
     target_industries = ['커피-음료', '제과점']
@@ -75,26 +79,47 @@ if df is not None and not df.empty:
             selected_district = st.selectbox("분석 상권 선택", filtered_df['상권명'].unique())
             selected_data = filtered_df[filtered_df['상권명'] == selected_district].iloc[0]
             st.metric("추정 매출액", f"{int(selected_data['당월_매출액']):,}원")
+        else:
+            st.warning("데이터가 없습니다.")
 
     # 3D 지도
+    layer = pdk.Layer(
+        'ColumnLayer', 
+        filtered_df, 
+        get_position='[lon, lat]', 
+        get_elevation='당월_매출액', 
+        elevation_scale=0.00002, 
+        radius=500, 
+        get_fill_color='[255, 50, 50, 200]', 
+        pickable=True,
+        auto_highlight=True
+    )
+    
     st.pydeck_chart(pdk.Deck(
-        layers=[pdk.Layer('ColumnLayer', filtered_df, get_position='[lon, lat]', get_elevation='당월_매출액', 
-                          elevation_scale=0.00002, radius=500, get_fill_color='[255, 50, 50, 200]', pickable=True)],
+        layers=[layer],
         initial_view_state=pdk.ViewState(latitude=37.5665, longitude=126.9780, zoom=11, pitch=45),
-        tooltip={"text": "상권명: {상권명}\n매출액: {당월_매출액}원"}
+        tooltip={"text": "상권명: {상권명}\n업종: {업종명}\n매출액: {당월_매출액}원"}
     ))
     
     st.subheader("📋 데이터 상세 보기")
-    # 경고 해결: use_container_width=True를 width='stretch'로 변경
+    # 최신 규격 반영: width='stretch'
     st.dataframe(filtered_df[['상권명', '업종명', '당월_매출액', '당월_매출건수']], width='stretch')
 
-    # 최신 AI 분석 로직
-    client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
-    
-    st.divider()
-    st.subheader(f"🤖 AI 컨설턴트 분석")
-    if st.button("AI 분석 리포트 생성"):
-        with st.spinner('분석 중...'):
-            prompt = f"{selected_district}의 {selected_data['업종명']} 상권 매출액 {selected_data['당월_매출액']}원을 기반으로 분석해줘."
-            response = client.models.generate_content(model="gemini-2.5-flash", contents=prompt)
-            st.write(response.text)
+    # AI 설정
+    try:
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"]) # Secrets의 이름과 맞춤
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        st.divider()
+        st.subheader(f"🤖 AI 컨설턴트 분석")
+        if st.button("AI 분석 리포트 생성"):
+            with st.spinner('전략을 세우는 중...'):
+                prompt = f"{selected_district}의 {selected_data['업종명']} 업종 매출 {int(selected_data['당월_매출액']):,}원을 바탕으로 짧고 강렬한 사업 전략을 제안해줘."
+                response = model.generate_content(prompt)
+                with st.chat_message("assistant", avatar="🤖"):
+                    st.markdown(response.text)
+    except Exception as e:
+        st.error(f"AI 설정 오류: Secrets에 'GEMINI_API_KEY'가 있는지 확인해주세요.")
+
+else:
+    st.error("데이터를 불러올 수 없습니다. API 서버 상태를 확인해주세요.")
