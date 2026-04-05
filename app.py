@@ -17,10 +17,10 @@ def convert_coords(row):
         return pd.Series([row['lon'], row['lat']])
 
 # 1. 페이지 설정
-st.set_page_config(page_title="서울 리얼티 AI - 데이터 센터", layout="wide")
+st.set_page_config(page_title="서울 & 경기 리얼티 AI - 데이터 센터", layout="wide")
 
-st.title("📊 서울시 상권 분석 & AI 컨설팅")
-st.caption("Seoul-Realty AI | 2026 서울시 빅데이터 활용 경진대회 출품작")
+st.title("📊 상권 분석 & AI 컨설팅 (서울 + 하남 미사)")
+st.caption("Seoul-Realty AI | 2026 서울시 빅데이터 활용 경진대회 출품작 (미사 상권 시뮬레이션 포함)")
 
 # API 및 서비스 설정
 API_KEY = '776274504662736c3132334e5a767861'
@@ -28,7 +28,7 @@ SERVICE = 'VwsmTrdarSelngQq'
 
 @st.cache_data(ttl=3600)
 def load_real_data():
-    # 💡 수정 포인트 1: 제과점 데이터를 확실히 확보하기 위해 1~1000번, 1001~2000번 데이터를 모두 가져와 합칩니다.
+    # 1~1000번, 1001~2000번 데이터를 모두 가져와 합칩니다.
     sales_url1 = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/1000/"
     sales_url2 = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1001/2000/"
     
@@ -45,7 +45,7 @@ def load_real_data():
 
     # 커피전문점 OR 제과점 합집합 필터링
     target_industries = ['커피-음료', '제과점']
-    sales_df = raw_sales_df[raw_sales_df['SVC_INDUTY_CD_NM'].isin(target_industries)]
+    sales_df = raw_sales_df[raw_sales_df['SVC_INDUTY_CD_NM'].isin(target_industries)].copy()
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(current_dir, 'commercial_area.csv')
@@ -71,12 +71,27 @@ def load_real_data():
     merged_df['상권명'] = merged_df['상권_코드_명']
     merged_df['업종명'] = merged_df['SVC_INDUTY_CD_NM']
 
-    return merged_df
+    # 💡 수정 포인트 1: 하남 미사강변도시 가상 데이터 추가
+    misa_mock_data = pd.DataFrame({
+        'TRDAR_CD': ['MISA01', 'MISA02', 'MISA03', 'MISA04'],
+        'SVC_INDUTY_CD_NM': ['커피-음료', '제과점', '커피-음료', '제과점'],
+        '상권명': ['미사역 중심상권', '미사역 중심상권', '망월천 수변공원 상권', '미사강변 학원가'],
+        'lon': [127.1925, 127.1930, 127.1890, 127.1850],  # 미사 좌표계
+        'lat': [37.5610, 37.5615, 37.5640, 37.5580],
+        '당월_매출액': [120000000, 85000000, 95000000, 60000000], # 현실적인 추정 매출
+        '당월_매출건수': [4000, 3500, 3200, 2000],
+        '업종명': ['커피-음료', '제과점', '커피-음료', '제과점']
+    })
+
+    # 서울 데이터와 미사 데이터 결합
+    final_df = pd.concat([merged_df, misa_mock_data], ignore_index=True)
+
+    return final_df
 
 df = load_real_data()
 
 if df is not None and not df.empty:
-    st.success(f"✅ 카페 & 베이커리 통합 데이터 분석 중! (분석 대상: {len(df)}개 상권)")
+    st.success(f"✅ 서울 & 하남 미사 통합 데이터 분석 중! (분석 대상: {len(df)}개 상권)")
     
     with st.sidebar:
         st.header("🔍 분석 조건 설정")
@@ -87,7 +102,7 @@ if df is not None and not df.empty:
         # 필터링 및 복사본 생성
         filtered_df = df[df['업종명'].isin(industry_filter)].copy()
         
-        # 💡 수정 포인트 2: 업종별 원통 색상 지정 (RGBA 값)
+        # 업종별 원통 색상 지정 (RGBA 값)
         def assign_color(row):
             if row['업종명'] == '제과점':
                 return [255, 165, 0, 200]  # 제과점은 주황색
@@ -96,39 +111,51 @@ if df is not None and not df.empty:
         filtered_df['color'] = filtered_df.apply(assign_color, axis=1)
         
         if not filtered_df.empty:
-            selected_district = st.selectbox("분석 상권 선택", filtered_df['상권명'].unique())
+            # 하남 미사 상권을 목록 맨 위로 올리기 위한 정렬 로직
+            all_districts = sorted(filtered_df['상권명'].unique())
+            misa_districts = [d for d in all_districts if '미사' in d]
+            seoul_districts = [d for d in all_districts if '미사' not in d]
+            sorted_districts = misa_districts + seoul_districts
+            
+            selected_district = st.selectbox("분석 상권 선택", sorted_districts)
             selected_data = filtered_df[filtered_df['상권명'] == selected_district].iloc[0]
             st.metric("추정 매출액", f"{int(selected_data['당월_매출액']):,}원")
         else:
             st.warning("선택한 업종에 대한 데이터가 존재하지 않습니다.")
 
-    # 3D 지도
+    # 3D 지도 (미사를 선택하면 카메라를 미사 쪽으로 이동)
+    if '미사' in selected_district:
+        initial_lat, initial_lon = 37.5610, 127.1925
+        zoom_level = 13
+    else:
+        initial_lat, initial_lon = 37.5665, 126.9780
+        zoom_level = 11
+
     layer = pdk.Layer(
         'ColumnLayer', 
         filtered_df, 
         get_position='[lon, lat]', 
         get_elevation='당월_매출액', 
         elevation_scale=0.00002, 
-        radius=500, 
-        get_fill_color='color',  # 💡 수정 포인트 3: 생성한 color 컬럼을 색상 데이터로 활용
+        radius=300,  # 촘촘하게 보기 위해 반경을 조금 줄였습니다.
+        get_fill_color='color',
         pickable=True,
         auto_highlight=True
     )
     
     st.pydeck_chart(pdk.Deck(
         layers=[layer],
-        initial_view_state=pdk.ViewState(latitude=37.5665, longitude=126.9780, zoom=11, pitch=45),
+        initial_view_state=pdk.ViewState(latitude=initial_lat, longitude=initial_lon, zoom=zoom_level, pitch=45),
         tooltip={"text": "상권명: {상권명}\n업종: {업종명}\n매출액: {당월_매출액}원"}
     ))
     
     st.subheader("📋 데이터 상세 보기")
-    # 최신 규격 반영: width='stretch'
     st.dataframe(filtered_df[['상권명', '업종명', '당월_매출액', '당월_매출건수']], width='stretch')
 
     # AI 설정
     try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"]) # Secrets의 이름과 맞춤
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         st.divider()
         st.subheader(f"🤖 AI 컨설턴트 분석")
