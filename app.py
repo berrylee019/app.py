@@ -28,16 +28,18 @@ SERVICE = 'VwsmTrdarSelngQq'
 
 @st.cache_data(ttl=3600)
 def load_real_data():
-    sales_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/100/"
+    # 💡 수정 포인트 1: 데이터를 1,000개로 늘려서 제과점 데이터도 안정적으로 확보합니다.
+    sales_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE}/1/1000/"
     try:
         sales_res = requests.get(sales_url).json()
         raw_sales_df = pd.DataFrame(sales_res[SERVICE]['row'])
-    except:
+    except Exception as e:
+        st.error(f"데이터 로드 실패: {e}")
         return None
 
-    # 커피전문점 OR 제과점 합집합 필터링 (최대 25개)
+    # 커피전문점 OR 제과점 합집합 필터링
     target_industries = ['커피-음료', '제과점']
-    sales_df = raw_sales_df[raw_sales_df['SVC_INDUTY_CD_NM'].isin(target_industries)].head(25)
+    sales_df = raw_sales_df[raw_sales_df['SVC_INDUTY_CD_NM'].isin(target_industries)]
 
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(current_dir, 'commercial_area.csv')
@@ -72,7 +74,11 @@ if df is not None and not df.empty:
     
     with st.sidebar:
         st.header("🔍 분석 조건 설정")
-        industry_filter = st.multiselect("업종 선택", options=df['업종명'].unique(), default=df['업종명'].unique())
+        
+        # 💡 수정 포인트 2: 선택지에 '커피-음료'와 '제과점'을 명시적으로 고정해 둡니다.
+        target_industries = ['커피-음료', '제과점']
+        industry_filter = st.multiselect("업종 선택", options=target_industries, default=target_industries)
+        
         filtered_df = df[df['업종명'].isin(industry_filter)]
         
         if not filtered_df.empty:
@@ -80,7 +86,7 @@ if df is not None and not df.empty:
             selected_data = filtered_df[filtered_df['상권명'] == selected_district].iloc[0]
             st.metric("추정 매출액", f"{int(selected_data['당월_매출액']):,}원")
         else:
-            st.warning("데이터가 없습니다.")
+            st.warning("선택한 업종에 대한 데이터가 존재하지 않습니다.")
 
     # 3D 지도
     layer = pdk.Layer(
@@ -112,7 +118,8 @@ if df is not None and not df.empty:
         
         st.divider()
         st.subheader(f"🤖 AI 컨설턴트 분석")
-        if st.button("AI 분석 리포트 생성"):
+        
+        if not filtered_df.empty and st.button("AI 분석 리포트 생성"):
             with st.spinner('전략을 세우는 중...'):
                 prompt = f"{selected_district}의 {selected_data['업종명']} 업종 매출 {int(selected_data['당월_매출액']):,}원을 바탕으로 짧고 강렬한 사업 전략을 제안해줘."
                 response = model.generate_content(prompt)
