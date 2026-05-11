@@ -52,14 +52,26 @@ def load_real_data():
     csv_path = os.path.join(current_dir, 'commercial_area.csv')
     
     try:
-        # 자치구 정보를 포함하기 위해 엑셀/CSV 구조 확인 필요 (일반적으로 상권 코드 데이터에 자치구가 포함됨)
         area_df = pd.read_csv(csv_path, encoding='cp949')
     except:
         area_df = pd.read_csv(csv_path, encoding='utf-8-sig')
     
-    # '자치구_명' 컬럼이 있다고 가정 (없을 경우 상권명에서 추출하거나 매핑 필요)
-    area_df = area_df[['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값', '자치구_명']]
-    area_df.rename(columns={'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat', '자치구_명': 'GU_NM'}, inplace=True)
+    # 💡 [에러 수정 포인트] 컬럼 존재 여부를 확인하고 안전하게 가져옵니다.
+    cols_to_use = ['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']
+    if '자치구_명' in area_df.columns:
+        cols_to_use.append('자치구_명')
+    
+    area_df = area_df[cols_to_use].copy()
+    
+    # 컬럼명 통일
+    rename_dict = {'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat'}
+    if '자치구_명' in area_df.columns:
+        rename_dict['자치구_명'] = 'GU_NM'
+    else:
+        # '자치구_명'이 파일에 없을 경우, 상권명에서 추출하거나 빈값 처리
+        area_df['GU_NM'] = "서울 지역" 
+        
+    area_df.rename(columns=rename_dict, inplace=True)
 
     sales_df['TRDAR_CD'] = sales_df['TRDAR_CD'].astype(str)
     area_df['TRDAR_CD'] = area_df['TRDAR_CD'].astype(str)
@@ -73,10 +85,13 @@ def load_real_data():
     merged_df['상권명'] = merged_df['상권_코드_명']
     merged_df['업종명'] = merged_df['SVC_INDUTY_CD_NM']
 
-    # 수혜 지역 여부 판단 로직
-    merged_df['is_benefit_zone'] = merged_df['GU_NM'].isin(BENEFIT_GU)
+    # 수혜 지역 판단 (GU_NM이 있을 때만 동작)
+    if 'GU_NM' in merged_df.columns:
+        merged_df['is_benefit_zone'] = merged_df['GU_NM'].apply(lambda x: any(gu in str(x) for gu in BENEFIT_GU))
+    else:
+        merged_df['is_benefit_zone'] = False
 
-    # 하남 미사 데이터 (하남은 서울 정책 직접 수혜지는 아니나 비교군으로 유지)
+    # 하남 데이터 결합 부분 생략 (기존 코드 유지)
     misa_mock_data = pd.DataFrame({
         'TRDAR_CD': ['MISA01', 'MISA02'],
         'SVC_INDUTY_CD_NM': ['커피-음료', '제과점'],
