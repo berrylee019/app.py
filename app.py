@@ -9,7 +9,7 @@ import google.generativeai as genai
 # 1. 변환기 및 정책 데이터 설정
 transformer = Transformer.from_crs("epsg:5181", "epsg:4326", always_xy=True)
 
-# 규제 완화 수혜 11개 자치구 (공공기여 50% -> 30% 완화 지역)
+# 규제 완화 수혜 11개 자치구
 BENEFIT_GU = ['은평구', '서대문구', '중랑구', '성북구', '강북구', '도봉구', '노원구', '동대문구', '강서구', '구로구', '금천구']
 
 def convert_coords(row):
@@ -56,20 +56,18 @@ def load_real_data():
     except:
         area_df = pd.read_csv(csv_path, encoding='utf-8-sig')
     
-    # 💡 [에러 수정 포인트] 컬럼 존재 여부를 확인하고 안전하게 가져옵니다.
+    # 💡 1. 자치구 유추 로직 강화
     cols_to_use = ['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값']
     if '자치구_명' in area_df.columns:
         cols_to_use.append('자치구_명')
     
     area_df = area_df[cols_to_use].copy()
     
-    # 컬럼명 통일
-    rename_dict = {'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat'}
+    rename_dict = {'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat', '상권_코드_명': '상권명'}
     if '자치구_명' in area_df.columns:
         rename_dict['자치구_명'] = 'GU_NM'
     else:
-        # '자치구_명'이 파일에 없을 경우, 상권명에서 추출하거나 빈값 처리
-        area_df['GU_NM'] = "서울 지역" 
+        area_df['GU_NM'] = "서울 지역" # 기본값
         
     area_df.rename(columns=rename_dict, inplace=True)
 
@@ -82,16 +80,16 @@ def load_real_data():
     merged_df['lat'] = pd.to_numeric(merged_df['lat'])
     merged_df['lon'] = pd.to_numeric(merged_df['lon'])
     merged_df['당월_매출액'] = pd.to_numeric(merged_df['THSMON_SELNG_AMT'], errors='coerce').fillna(0)
-    merged_df['상권명'] = merged_df['상권_코드_명']
     merged_df['업종명'] = merged_df['SVC_INDUTY_CD_NM']
 
-    # 수혜 지역 판단 (GU_NM이 있을 때만 동작)
-    if 'GU_NM' in merged_df.columns:
-        merged_df['is_benefit_zone'] = merged_df['GU_NM'].apply(lambda x: any(gu in str(x) for gu in BENEFIT_GU))
-    else:
-        merged_df['is_benefit_zone'] = False
+    # 💡 자치구 판단 로직 강화: 상권명에 자치구 이름이 포함된 경우까지 체크
+    def check_benefit(row):
+        target_text = str(row.get('GU_NM', '')) + " " + str(row.get('상권명', ''))
+        short_benefit_list = [gu.replace('구', '') for gu in BENEFIT_GU]
+        return any(gu in target_text for gu in short_benefit_list)
 
-    # 하남 데이터 결합 부분 생략 (기존 코드 유지)
+    merged_df['is_benefit_zone'] = merged_df.apply(check_benefit, axis=1)
+
     misa_mock_data = pd.DataFrame({
         'TRDAR_CD': ['MISA01', 'MISA02'],
         'SVC_INDUTY_CD_NM': ['커피-음료', '제과점'],
@@ -113,100 +111,69 @@ if df is not None and not df.empty:
     with st.sidebar:
         st.header("🔍 분석 및 정책 필터")
         
-        # 신규 기능: 역세권 수혜 구역 필터 토글
-        benefit_only = st.toggle("✨ 역세권 활성화 수혜 지역만 보기", value=False, help="공공기여 비율 완화(50%->30%)가 적용되는 11개 자치구 상권만 필터링합니다.")
-        
+        benefit_only = st.toggle("✨ 역세권 활성화 수혜 지역만 보기", value=False, help="공공기여 완화가 적용되는 11개 자치구 상권만 필터링합니다.")
         industry_filter = st.multiselect("업종 선택", options=['커피-음료', '제과점'], default=['커피-음료', '제과점'])
         
-        # 필터링 적용
+        # 💡 2. 데이터 유무 체크 및 필터링 강화
         filtered_df = df[df['업종명'].isin(industry_filter)].copy()
         if benefit_only:
             filtered_df = filtered_df[filtered_df['is_benefit_zone'] == True]
-        
-        # 색상 지정 로직 (수혜 지역은 황금색 테두리 효과를 위해 색상 차별화 가능)
-        def assign_color(row):
-            if row['is_benefit_zone']:
-                return [255, 215, 0, 230]  # 수혜 지역은 황금색(Gold)
-            return [255, 50, 50, 160] if row['업종명'] == '커피-음료' else [255, 165, 0, 160]
-            
-        filtered_df['color'] = filtered_df.apply(assign_color, axis=1)
         
         if not filtered_df.empty:
             sorted_districts = sorted(filtered_df['상권명'].unique())
             selected_district = st.selectbox("상세 분석 상권", sorted_districts)
             selected_data = filtered_df[filtered_df['상권명'] == selected_district].iloc[0]
             
-            # 수혜 지역 뱃지 표시
             if selected_data['is_benefit_zone']:
                 st.info(f"📍 **{selected_data['GU_NM']}**: 규제 완화 수혜 지역입니다.")
             
             st.metric("추정 매출액", f"{int(selected_data['당월_매출액']):,}원")
+            
+            def assign_color(row):
+                if row['is_benefit_zone']:
+                    return [255, 215, 0, 230] 
+                return [255, 50, 50, 160] if row['업종명'] == '커피-음료' else [255, 165, 0, 160]
+            filtered_df['color'] = filtered_df.apply(assign_color, axis=1)
         else:
-            st.warning("조건에 맞는 데이터가 없습니다.")
+            st.warning("⚠️ 해당 조건에 맞는 데이터가 없습니다.")
+            selected_district = None
 
-    # 3. 3D 시각화
-    initial_lat = selected_data['lat'] if not filtered_df.empty else 37.5665
-    initial_lon = selected_data['lon'] if not filtered_df.empty else 126.9780
-
-    layer = pdk.Layer(
-        'ColumnLayer', 
-        filtered_df, 
-        get_position='[lon, lat]', 
-        get_elevation='당월_매출액', 
-        elevation_scale=0.00005, 
-        radius=250, 
-        get_fill_color='color',
-        pickable=True,
-        auto_highlight=True
-    )
-    
-    st.pydeck_chart(pdk.Deck(
-        layers=[layer],
-        initial_view_state=pdk.ViewState(latitude=initial_lat, longitude=initial_lon, zoom=12, pitch=45),
-        tooltip={"text": "상권명: {상권명} ({GU_NM})\n매출액: {당월_매출액}원\n수혜구역: {is_benefit_zone}"}
-    ))
-    
-    # 4. AI 컨설턴트 (정책 맞춤형 프롬프트 튜닝)
-    try:
-        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-        model = genai.GenerativeModel('gemini-1.5-flash')
+    # 지도 및 AI 리포트 출력 제어
+    if selected_district:
+        # 3. 3D 시각화
+        initial_lat, initial_lon = selected_data['lat'], selected_data['lon']
+        layer = pdk.Layer(
+            'ColumnLayer', filtered_df, get_position='[lon, lat]',
+            get_elevation='당월_매출액', elevation_scale=0.00005,
+            radius=250, get_fill_color='color', pickable=True, auto_highlight=True
+        )
+        st.pydeck_chart(pdk.Deck(
+            layers=[layer],
+            initial_view_state=pdk.ViewState(latitude=initial_lat, longitude=initial_lon, zoom=12, pitch=45),
+            tooltip={"text": "상권명: {상권명} ({GU_NM})\n매출액: {당월_매출액}원\n수혜구역: {is_benefit_zone}"}
+        ))
         
-        st.divider()
-        st.subheader(f"🤖 정책 연계 AI 비즈니스 리포트")
-        
-        if not filtered_df.empty and st.button("AI 정책 분석 리포트 생성"):
-            with st.spinner('서울시 최신 정책과 매출 데이터를 결합 분석 중...'):
-                # 정책 맞춤형 프롬프트 설계
-                policy_context = ""
-                if selected_data['is_benefit_zone']:
-                    policy_context = (
-                        f"이 지역은 서울시 '역세권 활성화 사업'의 직접 수혜지인 {selected_data['GU_NM']}에 속해 있습니다. "
-                        "공공기여 비율이 30%로 낮아지고 고밀 개발이 예상되므로, 인구 밀도 급증에 대비한 전략을 포함해줘."
-                    )
-                else:
-                    policy_context = "서울시 전역 역세권 용도지역 상향 및 '직주락' 활성화 전략을 바탕으로 전략을 세워줘."
+        # 4. AI 컨설턴트
+        try:
+            genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+            model = genai.GenerativeModel('gemini-1.5-flash')
+            st.divider()
+            st.subheader(f"🤖 정책 연계 AI 비즈니스 리포트")
+            
+            if st.button("AI 정책 분석 리포트 생성"):
+                with st.spinner('전략 수립 중...'):
+                    policy_context = (f"이 지역은 서울시 '역세권 활성화 사업'의 직접 수혜지인 {selected_data['GU_NM']}에 속합니다." 
+                                     if selected_data['is_benefit_zone'] else "서울시 역세권 '직주락' 활성화 전략 기반입니다.")
+                    prompt = f"상권 전문가로서 {selected_district}의 {selected_data['업종명']}(매출:{int(selected_data['당월_매출액']):,}원) 분석 리포트를 작성해줘. {policy_context}"
+                    response = model.generate_content(prompt)
+                    with st.chat_message("assistant", avatar="🤖"):
+                        st.markdown(response.text)
+        except Exception as e:
+            st.error("AI 연결 확인이 필요합니다.")
 
-                prompt = f"""
-                너는 서울시 도시계획 전문가이자 상권 분석가야.
-                상권명: {selected_district} / 업종: {selected_data['업종명']} / 월 매출: {int(selected_data['당월_매출액']):,}원
-                
-                {policy_context}
-                
-                위 데이터를 바탕으로 다음 내용을 포함해 '짧고 강렬하게' 컨설팅해줘:
-                1. 상권 현황 진단
-                2. 역세권 고밀 개발에 따른 미래 가치 및 기회 요인
-                3. 소상공인을 위한 실전 대응 전략 (메뉴, 마케팅, 공간 활용 등)
-                """
-                
-                response = model.generate_content(prompt)
-                with st.chat_message("assistant", avatar="🤖"):
-                    st.markdown(response.text)
-                    
-    except Exception as e:
-        st.error("AI 연결 확인이 필요합니다. (API Key 설정 등)")
-
-    st.subheader("📋 데이터 상세 시트")
-    st.dataframe(filtered_df[['상권명', 'GU_NM', '업종명', '당월_매출액', 'is_benefit_zone']], width='stretch')
-
+        st.subheader("📋 데이터 상세 시트")
+        st.dataframe(filtered_df[['상권명', 'GU_NM', '업종명', '당월_매출액', 'is_benefit_zone']], width='stretch')
+    else:
+        st.info("왼쪽 사이드바에서 상권을 선택하거나 필터를 조정해 주세요.")
 else:
-    st.error("데이터 로드 중입니다. 잠시만 기다려주세요.")
+    st.error("데이터 로드 중입니다.")
