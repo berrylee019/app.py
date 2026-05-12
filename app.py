@@ -128,12 +128,40 @@ if df is not None and not df.empty:
             selected_district = None
 
     if selected_district:
-        st.pydeck_chart(pdk.Deck(
-            layers=[pdk.Layer('ColumnLayer', filtered_df, get_position='[lon, lat]', get_elevation='당월_매출액', 
-                              elevation_scale=0.05, radius=200, get_fill_color='color', pickable=True)],
-            initial_view_state=pdk.ViewState(latitude=selected_data['lat'], longitude=selected_data['lon'], zoom=13, pitch=45),
-            tooltip={"text": "{상권명}\n매출: {당월_매출액}원\n인구: {유동인구}명"}
-        ))
+            # 1. 사이드바에 막대 높이 조절 슬라이더 추가 (사용자 편의성)
+            with st.sidebar:
+                st.divider()
+                st.subheader("📏 시각화 설정")
+                # 매출액 단위가 크므로 매우 작은 값부터 조절 가능하게 설정
+                elev_scale = st.slider("막대 높이 조절", min_value=0.000001, max_value=0.0001, value=0.00001, format="%.6f")
+    
+            # 2. 3D 시각화 레이어 수정
+            initial_lat, initial_lon = selected_data['lat'], selected_data['lon']
+            layer = pdk.Layer(
+                'ColumnLayer', 
+                filtered_df, 
+                get_position='[lon, lat]',
+                get_elevation='당월_매출액', 
+                elevation_scale=elev_scale, # 슬라이더 값 적용
+                radius=200, 
+                get_fill_color='color', 
+                pickable=True, 
+                auto_highlight=True
+            )
+    
+            st.pydeck_chart(pdk.Deck(
+                layers=[layer],
+                initial_view_state=pdk.ViewState(
+                    latitude=initial_lat, 
+                    longitude=initial_lon, 
+                    zoom=13, 
+                    pitch=45
+                ),
+                tooltip={
+                    "html": "<b>상권명:</b> {상권명}<br/><b>매출:</b> {당월_매출액}원<br/><b>인구:</b> {유동인구}명",
+                    "style": {"color": "white"}
+                }
+            ))
         
         st.divider()
         st.subheader("🤖 융합 데이터 기반 AI 비즈니스 리포트")
