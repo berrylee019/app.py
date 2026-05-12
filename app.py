@@ -143,7 +143,7 @@ if df is not None and not df.empty:
             else:
                 try:
                     genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                    model = genai.GenerativeModel('gemini-1.5-flash')
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     with st.spinner('인구-매출 융합 분석 중...'):
                         prompt = f"{selected_district} {selected_data['업종명']} 분석. 매출 {int(selected_data['당월_매출액'])}원, 유동인구 {int(selected_data['유동인구'])}명. 역세권 정책 기반 전략 제안."
                         response = model.generate_content(prompt)
