@@ -21,7 +21,10 @@ def convert_coords(row):
         return pd.Series([row.get('lon', 0), row.get('lat', 0)])
 
 # 2. 페이지 설정
-st.set_page_config(page_title="서울 상권 융합분석 AI", layout="wide")
+st.set_page_config(page_title="비즈니스 큐브(Biz-Cube) AI", layout="wide")
+left_co, cent_co, last_co = st.columns([1, 1, 1])
+with cent_co:
+    st.image("logo.jpg", width=200)
 st.title("비즈니스 큐브(Biz-Cube) AI")
 st.caption("Biz-Cube AI | 위치+인구+매출+정책 데이터 결합 버전")
 
