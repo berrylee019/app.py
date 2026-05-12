@@ -22,7 +22,7 @@ def convert_coords(row):
 
 # 2. 페이지 설정
 st.set_page_config(page_title="비즈니스 큐브(Biz-Cube) AI", layout="wide")
-left_co, cent_co, last_co = st.columns([1, 1, 1])
+left_co, cent_co, last_co = st.columns([2, 1, 2])
 with cent_co:
     st.image("logo.jpg", width=200)
 st.title("비즈니스 큐브(Biz-Cube) AI")
