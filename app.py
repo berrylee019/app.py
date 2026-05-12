@@ -142,7 +142,7 @@ if df is not None and not df.empty:
         ))
         
         st.divider()
-        st.subheader("🤖 융합 데이터 기반 AI 비즈니스 리포트")
+        st.subheader(" 융합 데이터 기반 AI 비즈니스 리포트")
         if st.button("AI 융합 분석 리포트 생성"):
             if "GEMINI_API_KEY" not in st.secrets:
                 st.error("Secrets에 GEMINI_API_KEY가 없습니다.")
