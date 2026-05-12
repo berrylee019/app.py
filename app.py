@@ -22,7 +22,7 @@ def convert_coords(row):
 
 # 2. 페이지 설정
 st.set_page_config(page_title="서울 상권 융합분석 AI", layout="wide")
-st.title("📊 서울 상권(융합)분석 AI")
+st.title("📊 인구-매출 매칭 AI")
 st.caption("Seoul-Realty AI | 인구+매출 데이터 결합 버전")
 
 # API 설정
