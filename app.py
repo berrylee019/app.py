@@ -22,8 +22,8 @@ def convert_coords(row):
 # 2. 페이지 설정
 st.set_page_config(page_title="서울 & 경기 리얼티 AI - 데이터 융합 분석", layout="wide")
 
-st.title("📊 역세권 직주락 활성화 & AI 상권 융합 분석")
-st.caption("Seoul-Realty AI | 2026 서울시 빅데이터 경진대회용 (인구+매출 데이터 결합 버전)")
+st.title("서울 역세권 활력 플러스(Plus) & AI 상권 융합 분석")
+st.caption("Seoul-Realty AI | 인구+매출 데이터 결합 버전")
 
 # API 및 서비스 설정
 API_KEY = '776274504662736c3132334e5a767861'
