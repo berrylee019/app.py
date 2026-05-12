@@ -141,26 +141,26 @@ if df is not None and not df.empty:
             tooltip={"text": "상권명: {상권명} ({GU_NM})\n매출액: {당월_매출액}원\n유동인구: {유동인구}명\n수혜구역: {is_benefit_zone}"}
         ))
         
-            st.divider()
-            st.subheader("🤖 융합 데이터 기반 AI 비즈니스 리포트")
-            if st.button("AI 융합 분석 리포트 생성"):
-                if "GEMINI_API_KEY" not in st.secrets:
-                    st.error("Secrets에 GEMINI_API_KEY가 없습니다.")
-                else:
-                    try:
-                        genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
-                        model = genai.GenerativeModel('gemini-2.5-flash')
-                        with st.spinner('인구-매출 융합 분석 중...'):
-                            prompt = f"{selected_district} {selected_data['업종명']} 분석. 매출 {int(selected_data['당월_매출액'])}원, 유동인구 {int(selected_data['유동인구'])}명. 역세권 정책 기반 전략 제안."
-                            response = model.generate_content(prompt)
-                            st.chat_message("assistant", avatar="🤖").markdown(response.text)
-                    except Exception as e:
-                        st.error(f"AI 호출 실패: {e}")
-    
-            st.subheader("📋 데이터 상세 시트")
-            # KeyError 방지를 위해 존재하는 컬럼만 선택
-            target_cols = ['상권명', 'GU_NM', '업종명', '당월_매출액', '유동인구', 'is_benefit_zone']
-            safe_cols = [c for c in target_cols if c in filtered_df.columns]
-            st.dataframe(filtered_df[safe_cols], width='stretch')
-    else:
-        st.error("데이터 로드 중입니다. 잠시만 기다려 주세요.")
+        st.divider()
+        st.subheader("🤖 융합 데이터 기반 AI 비즈니스 리포트")
+        if st.button("AI 융합 분석 리포트 생성"):
+            if "GEMINI_API_KEY" not in st.secrets:
+                st.error("Secrets에 GEMINI_API_KEY가 없습니다.")
+            else:
+                try:
+                    genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    with st.spinner('인구-매출 융합 분석 중...'):
+                        prompt = f"{selected_district} {selected_data['업종명']} 분석. 매출 {int(selected_data['당월_매출액'])}원, 유동인구 {int(selected_data['유동인구'])}명. 역세권 정책 기반 전략 제안."
+                        response = model.generate_content(prompt)
+                        st.chat_message("assistant", avatar="🤖").markdown(response.text)
+                except Exception as e:
+                    st.error(f"AI 호출 실패: {e}")
+
+        st.subheader("📋 데이터 상세 시트")
+        # KeyError 방지를 위해 존재하는 컬럼만 선택
+        target_cols = ['상권명', 'GU_NM', '업종명', '당월_매출액', '유동인구', 'is_benefit_zone']
+        safe_cols = [c for c in target_cols if c in filtered_df.columns]
+        st.dataframe(filtered_df[safe_cols], width='stretch')
+else:
+    st.error("데이터 로드 중입니다. 잠시만 기다려 주세요.")
