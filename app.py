@@ -183,12 +183,18 @@ def add_to_sheet(email, region):
     creds_dict = dict(gcp_creds)
     
     # 3. gspread 연결 (json 파일 없이 딕셔너리로 직접 인증)
-    scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets']
-    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-    client = gspread.authorize(creds)
-    
-    sheet = client.open("시트1").sheet1 
-    sheet.append_row([email, region])
+    scope = [
+            "https://www.googleapis.com/auth/spreadsheets",
+            "https://www.googleapis.com/auth/drive"
+        ]
+        
+        # 딕셔너리로 인증할 때 scope를 반드시 넣어줘야 합니다.
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
+        client = gspread.authorize(creds)
+        
+        sheet = client.open("BizCube_Reservation").sheet1 
+        # 데이터 추가 시도
+        sheet.append_row([email, region])
 
 st.divider()
 st.subheader("🚀 비즈니스 큐브 AI 사전 예약")
