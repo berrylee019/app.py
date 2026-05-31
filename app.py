@@ -173,20 +173,20 @@ else:
 # --- 4. 얼리버드 사전 예약 시스템 (하단 추가) ---
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 def add_to_sheet(email, region):
-    # 구글 시트 연동 설정
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        'https://www.googleapis.com/auth/spreadsheets',
-        "https://www.googleapis.com/auth/drive.file",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    # 서비스 계정 키 파일 경로
-    creds = ServiceAccountCredentials.from_json_keyfile_name('시트1', scope)
+    # 1. secrets에서 정보 가져오기
+    gcp_creds = st.secrets["gcp"]
+    
+    # 2. 딕셔너리 형태로 변환
+    creds_dict = dict(gcp_creds)
+    
+    # 3. gspread 연결 (json 파일 없이 딕셔너리로 직접 인증)
+    scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets']
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     client = gspread.authorize(creds)
     
-    # 시트 열기 (시트 파일명을 정확히 입력하세요)
     sheet = client.open("시트1").sheet1 
     sheet.append_row([email, region])
 
