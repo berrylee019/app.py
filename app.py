@@ -5,6 +5,9 @@ import pydeck as pdk
 import os
 from pyproj import Transformer
 import google.generativeai as genai
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+import json
 
 # 1. 변환기 및 정책 데이터 설정
 transformer = Transformer.from_crs("epsg:5181", "epsg:4326", always_xy=True)
@@ -12,7 +15,6 @@ BENEFIT_GU = ['은평구', '서대문구', '중랑구', '성북구', '강북구'
 
 def convert_coords(row):
     try:
-        # csv에서 읽어온 컬럼명이 다를 수 있으므로 안전하게 처리
         lon = row.get('lon', row.get('엑스좌표_값', 0))
         lat = row.get('lat', row.get('와이좌표_값', 0))
         new_lon, new_lat = transformer.transform(lon, lat)
@@ -40,12 +42,10 @@ def load_real_data():
     pop_url = f"http://openapi.seoul.go.kr:8088/{API_KEY}/json/{SERVICE_POP}/1/1000/"
     
     try:
-        # A. 매출 데이터 로드
         sales_res = requests.get(sales_url, timeout=TIMEOUT).json()
         if SERVICE_SALES not in sales_res: raise ValueError("매출 API 응답 이상")
         raw_sales_df = pd.DataFrame(sales_res[SERVICE_SALES]['row'])
         
-        # B. 유동인구 데이터 로드
         pop_res = requests.get(pop_url, timeout=TIMEOUT).json()
         if SERVICE_POP not in pop_res:
             pop_summary = pd.DataFrame(columns=['TRDAR_CD', '유동인구'])
@@ -57,24 +57,18 @@ def load_real_data():
             
     except Exception as e:
         st.error(f"실시간 데이터 로드 실패: {e}")
-        return pd.DataFrame() # 빈 데이터프레임 반환하여 앱 중단 방지
+        return pd.DataFrame()
 
-    # 업종 필터
     target_industries = ['커피-음료', '제과점']
     sales_df = raw_sales_df[raw_sales_df['SVC_INDUTY_CD_NM'].isin(target_industries)].copy()
 
-    # 위치 데이터 로드
     current_dir = os.path.dirname(os.path.abspath(__file__))
     csv_path = os.path.join(current_dir, 'commercial_area.csv')
     try:
         area_df = pd.read_csv(csv_path, encoding='cp949')
     except:
-        try:
-            area_df = pd.read_csv(csv_path, encoding='utf-8-sig')
-        except:
-            area_df = pd.DataFrame(columns=['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값', '자치구_명'])
+        area_df = pd.DataFrame(columns=['상권_코드', '상권_코드_명', '엑스좌표_값', '와이좌표_값', '자치구_명'])
 
-    # 컬럼 정리 및 병합
     area_df.rename(columns={'상권_코드': 'TRDAR_CD', '엑스좌표_값': 'lon', '와이좌표_값': 'lat', '상권_코드_명': '상권명', '자치구_명': 'GU_NM'}, inplace=True, errors='ignore')
     if 'GU_NM' not in area_df.columns: area_df['GU_NM'] = "서울 지역"
 
@@ -95,7 +89,6 @@ def load_real_data():
         return any(gu.replace('구', '') in target_text for gu in BENEFIT_GU)
     merged_df['is_benefit_zone'] = merged_df.apply(check_benefit, axis=1)
 
-    # 하남 가상 데이터 (컬럼 구조 완전 일치)
     misa_mock = pd.DataFrame({
         'TRDAR_CD': ['MISA01'], '상권명': ['미사역 중심상권'], 'GU_NM': ['하남시'],
         'lon': [127.1925], 'lat': [37.5610], '당월_매출액': [120000000], '유동인구': [45000],
@@ -131,7 +124,6 @@ if df is not None and not df.empty:
             selected_district = None
 
     if selected_district:
-        # 3. 3D 시각화
         initial_lat, initial_lon = selected_data['lat'], selected_data['lon']
         layer = pdk.Layer(
             'ColumnLayer', filtered_df, get_position='[lon, lat]',
@@ -161,54 +153,34 @@ if df is not None and not df.empty:
                     st.error(f"AI 호출 실패: {e}")
 
         st.subheader("📋 데이터 상세 시트")
-        # KeyError 방지를 위해 존재하는 컬럼만 선택
         target_cols = ['상권명', 'GU_NM', '업종명', '당월_매출액', '유동인구', 'is_benefit_zone']
         safe_cols = [c for c in target_cols if c in filtered_df.columns]
-        st.dataframe(filtered_df[safe_cols], width='stretch')
+        st.dataframe(filtered_df[safe_cols], width=1000)
+
 else:
     st.error("데이터 로드 중입니다. 잠시만 기다려 주세요.")
 
-# --- [기존 코드 생략] 위쪽 코드는 그대로 유지됩니다 ---
-
-# --- 4. 얼리버드 사전 예약 시스템 (하단 추가) ---
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import json
-
+# --- 얼리버드 사전 예약 시스템 ---
 def add_to_sheet(email, region):
-    # 1. secrets에서 정보 가져오기
-    gcp_creds = st.secrets["gcp"]
-    
-    # 2. 딕셔너리 형태로 변환
-    creds_dict = dict(gcp_creds)
-    
-    # 3. gspread 연결 (json 파일 없이 딕셔너리로 직접 인증)
-    scope = [
-        "https://www.googleapis.com/auth/spreadsheets",
-        "https://www.googleapis.com/auth/drive"
-    ]
-    
-    # 딕셔너리로 인증할 때 scope를 반드시 넣어줘야 합니다.
+    scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
     client = gspread.authorize(creds)
-    
     sheet = client.open("시트1").sheet1 
-    # 데이터 추가 시도
     sheet.append_row([email, region])
 
 st.divider()
 st.subheader("🚀 비즈니스 큐브 AI 사전 예약")
-st.info("얼리버드 신청자에게는 향후 업데이트 및 정책 분석 리포트 우선 제공 혜택을 드립니다.")
-
 with st.form("early_bird_form"):
     email = st.text_input("📩 이메일 주소")
-    # 분석 가능한 자치구 목록 추출
-    regions = sorted(df['GU_NM'].unique()) if 'GU_NM' in df.columns else ["강남구", "마포구", "성동구"]
-    region = st.selectbox("📍 관심 지역 (자치구)", regions)
     
-    submitted = st.form_submit_button("얼리버드 신청하기")
+    # 확장된 지역 리스트
+    base_cities = ["서울 전역", "하남시", "수원시", "성남시", "고양시", "용인시", "부산광역시", "대구광역시", "인천광역시", "광주광역시", "대전광역시", "울산광역시", "세종특별자치시"]
+    data_regions = df['GU_NM'].unique().tolist() if 'GU_NM' in df.columns else []
+    all_regions = sorted(list(set(base_cities + data_regions)))
     
-    if submitted:
+    region = st.selectbox("📍 관심 지역 (자치구/도시)", all_regions)
+    
+    if st.form_submit_button("얼리버드 신청하기"):
         if email:
             try:
                 add_to_sheet(email, region)
@@ -216,6 +188,5 @@ with st.form("early_bird_form"):
                 st.balloons()
             except Exception as e:
                 st.error(f"구글 시트 연결 오류: {e}")
-                st.caption("주의: service_account.json 파일이 존재하며, 시트 권한이 부여되었는지 확인하세요.")
         else:
             st.warning("이메일을 입력해주세요.")
