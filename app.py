@@ -184,17 +184,17 @@ def add_to_sheet(email, region):
     
     # 3. gspread 연결 (json 파일 없이 딕셔너리로 직접 인증)
     scope = [
-            "https://www.googleapis.com/auth/spreadsheets",
-            "https://www.googleapis.com/auth/drive"
-        ]
-        
-        # 딕셔너리로 인증할 때 scope를 반드시 넣어줘야 합니다.
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
-        client = gspread.authorize(creds)
-        
-        sheet = client.open("시트1").sheet1 
-        # 데이터 추가 시도
-        sheet.append_row([email, region])
+        "https://www.googleapis.com/auth/spreadsheets",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    
+    # 딕셔너리로 인증할 때 scope를 반드시 넣어줘야 합니다.
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
+    client = gspread.authorize(creds)
+    
+    sheet = client.open("시트1").sheet1 
+    # 데이터 추가 시도
+    sheet.append_row([email, region])
 
 st.divider()
 st.subheader("🚀 비즈니스 큐브 AI 사전 예약")
