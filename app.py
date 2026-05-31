@@ -192,7 +192,7 @@ def add_to_sheet(email, region):
         creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
         client = gspread.authorize(creds)
         
-        sheet = client.open("BizCube_Reservation").sheet1 
+        sheet = client.open("시트1").sheet1 
         # 데이터 추가 시도
         sheet.append_row([email, region])
 
