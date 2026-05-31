@@ -183,7 +183,7 @@ def add_to_sheet(email, region):
         "https://www.googleapis.com/auth/drive"
     ]
     # 서비스 계정 키 파일 경로
-    creds = ServiceAccountCredentials.from_json_keyfile_name('service_account.json', scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name('시트1', scope)
     client = gspread.authorize(creds)
     
     # 시트 열기 (시트 파일명을 정확히 입력하세요)
