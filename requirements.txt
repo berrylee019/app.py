@@ -4,3 +4,5 @@ pandas
 pydeck
 google-generativeai
 pyproj
+gspread
+oauth2client
