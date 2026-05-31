@@ -187,7 +187,7 @@ def add_to_sheet(email, region):
     client = gspread.authorize(creds)
     
     # 시트 열기 (시트 파일명을 정확히 입력하세요)
-    sheet = client.open("BizCube_Reservation").sheet1 
+    sheet = client.open("시트1").sheet1 
     sheet.append_row([email, region])
 
 st.divider()
