@@ -167,3 +167,49 @@ if df is not None and not df.empty:
         st.dataframe(filtered_df[safe_cols], width='stretch')
 else:
     st.error("데이터 로드 중입니다. 잠시만 기다려 주세요.")
+
+# --- [기존 코드 생략] 위쪽 코드는 그대로 유지됩니다 ---
+
+# --- 4. 얼리버드 사전 예약 시스템 (하단 추가) ---
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+def add_to_sheet(email, region):
+    # 구글 시트 연동 설정
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        'https://www.googleapis.com/auth/spreadsheets',
+        "https://www.googleapis.com/auth/drive.file",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    # 서비스 계정 키 파일 경로
+    creds = ServiceAccountCredentials.from_json_keyfile_name('service_account.json', scope)
+    client = gspread.authorize(creds)
+    
+    # 시트 열기 (시트 파일명을 정확히 입력하세요)
+    sheet = client.open("BizCube_Reservation").sheet1 
+    sheet.append_row([email, region])
+
+st.divider()
+st.subheader("🚀 비즈니스 큐브 AI 사전 예약")
+st.info("얼리버드 신청자에게는 향후 업데이트 및 정책 분석 리포트 우선 제공 혜택을 드립니다.")
+
+with st.form("early_bird_form"):
+    email = st.text_input("📩 이메일 주소")
+    # 분석 가능한 자치구 목록 추출
+    regions = sorted(df['GU_NM'].unique()) if 'GU_NM' in df.columns else ["강남구", "마포구", "성동구"]
+    region = st.selectbox("📍 관심 지역 (자치구)", regions)
+    
+    submitted = st.form_submit_button("얼리버드 신청하기")
+    
+    if submitted:
+        if email:
+            try:
+                add_to_sheet(email, region)
+                st.success("신청 완료되었습니다! 런칭 시 연락드릴게요.")
+                st.balloons()
+            except Exception as e:
+                st.error(f"구글 시트 연결 오류: {e}")
+                st.caption("주의: service_account.json 파일이 존재하며, 시트 권한이 부여되었는지 확인하세요.")
+        else:
+            st.warning("이메일을 입력해주세요.")
